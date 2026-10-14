@@ -50,18 +50,20 @@ export async function addFromFiles(files: File[]): Promise<LoadedBook> {
     bookText: bookFile ? (await readTextFile(bookFile)).text : null,
   }
   const meta = await upsert(bookId(audio.name, audio.size), baseName(audio.name), audio.name, audio.size, texts, bookFile ? (ext === 'txt' ? 'txt' : 'md') : null)
+  const mp3 = await probeMp3(audio, audio.name)
   keepInApp(meta, audio)
   const url = URL.createObjectURL(audio)
-  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
+  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), mp3)
 }
 
 /** 서재에서 다시 열기: 오디오만 다시 고름(Q33 A) */
 export async function reopen(meta: BookMeta, audio: File): Promise<LoadedBook> {
   const texts = await getTexts(meta.id)
   if (!texts) throw new Error('저장된 자막을 찾지 못했습니다. 책을 다시 추가해 주세요.')
+  const mp3 = await probeMp3(audio, audio.name)
   keepInApp(meta, audio)
   const url = URL.createObjectURL(audio)
-  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
+  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), mp3)
 }
 
 /** 앱 안에 보관한 오디오로 바로 열기. 보관본이 없으면 null(파일을 다시 골라야 함) */
