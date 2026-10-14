@@ -1,5 +1,6 @@
 // AC-3: 1GB 오디오를 열어 재생하고 임의 위치로 50번 이동해도 브라우저 메모리 증가가 300MB 미만
 // 준비: sh scripts/make-big-fixture.sh  (local-fixtures/big-1gb.mp3, .srt)
+import { addBook } from './helpers'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -39,7 +40,7 @@ test(`1GB 오디오 재생·이동 ${SEEKS}회 메모리`, async ({ baseURL }) =
   const base = browserRssMB()
 
   const t0 = Date.now()
-  await page.locator('.top input[type=file]').setInputFiles([MP3, SRT])
+  await addBook(page, [MP3, SRT])
   await page.waitForSelector('.reader .s', { timeout: 60_000 })
   const openMs = Date.now() - t0
   // 앱 안 보관(OPFS 복사)이 끝날 때까지 기다림. 복사 중에는 Chrome이 원본 파일을 읽으며

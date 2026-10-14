@@ -525,3 +525,69 @@ button {
   cursor: pointer;
   font-size: inherit;
 }
+
+/* 책 추가 트레이와 끌어다 놓기 */
+.tray {
+  margin: 8px 0 16px;
+  padding: 4px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.tray-row {
+  flex-wrap: nowrap;
+}
+.tray-label {
+  flex: none;
+  width: 7.5em;
+  font-weight: 600;
+}
+.tray-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+.tray-file.blank {
+  color: var(--muted);
+}
+.open.small {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+.tray-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+}
+.primary {
+  min-width: 96px;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.drop-overlay {
+  position: fixed;
+  inset: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--accent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  pointer-events: none;
+}

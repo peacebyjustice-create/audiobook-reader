@@ -1,4 +1,5 @@
 // 앱 안 보관(F26)과 이어 듣기: 한 번 추가하면 새로고침·서재에서 파일을 다시 고르지 않고 마지막 위치로 열림
+import { addBook } from './helpers'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
@@ -13,7 +14,7 @@ const pos = (page: import('@playwright/test').Page) => page.evaluate(() => docum
 
 test('한 번 추가한 책은 다시 고르지 않고 마지막 위치에서 열림', async ({ page }) => {
   await page.goto('/')
-  await page.locator('.top input[type=file]').setInputFiles([AUDIO, join(SAMPLES, `${NAME}.srt`), join(SAMPLES, `${NAME}.md`)])
+  await addBook(page, [AUDIO, join(SAMPLES, `${NAME}.srt`), join(SAMPLES, `${NAME}.md`)])
   await page.waitForSelector('.reader .s')
   // 40번 문장부터 재생, 저장 주기(5초)보다 조금 더 기다림
   await page.locator('[data-seg="40"]').click()
