@@ -27,13 +27,13 @@ async function sessionFromFiles(files: File[]): Promise<Session> {
   return { title: baseName(audio.name), audioUrl, revoke: () => URL.revokeObjectURL(audioUrl), cues }
 }
 
-/** 개발 전용: ?fixture=<파일명(확장자 제외)>이면 samples/에서 HTTP Range로 불러옴(NFR-10) */
-async function sessionFromFixture(name: string): Promise<Session> {
+/** 개발 전용: ?fixture=<파일명(확장자 제외)>[&ext=m4a]이면 samples/에서 HTTP Range로 불러옴(NFR-10) */
+async function sessionFromFixture(name: string, ext = 'mp3'): Promise<Session> {
   const base = `/samples/${encodeURIComponent(name)}`
   const res = await fetch(`${base}.srt`)
   if (!res.ok) throw new Error(`픽스처 자막 없음: ${name}`)
   const { cues } = parseSrt(await res.text())
-  return { title: name, audioUrl: `${base}.mp3`, cues }
+  return { title: name, audioUrl: `${base}.${ext}`, cues }
 }
 
 function formatTime(ms: number): string {
@@ -96,8 +96,9 @@ export default function App() {
 
   // 개발용 픽스처
   useEffect(() => {
-    const name = import.meta.env.DEV ? new URLSearchParams(location.search).get('fixture') : null
-    if (name) sessionFromFixture(name).then(open, (e: Error) => setError(e.message))
+    const q = new URLSearchParams(location.search)
+    const name = import.meta.env.DEV ? q.get('fixture') : null
+    if (name) sessionFromFixture(name, q.get('ext') ?? undefined).then(open, (e: Error) => setError(e.message))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 첫 로드에 한 번만
   }, [])
   const current = player ? player.currentIndex() : -1
@@ -152,13 +153,13 @@ export default function App() {
         </label>
       </header>
 
-      {error && <p className="error">{error}</p>}
+      {(error || snap.error) && <p className="error">{error || snap.error}</p>}
 
       {session ? (
         <CueText cues={session.cues} onTap={onTap} />
       ) : (
         <section className="empty">
-          <p>낭독 오디오(mp3 등)와 자막(.srt)을 함께 골라 주세요.</p>
+          <p>낭독 오디오(mp3·m4a)와 자막(.srt)을 함께 골라 주세요.</p>
           <p>재생 중인 문장이 강조되고, 문장을 누르면 거기서부터 재생합니다.</p>
         </section>
       )}

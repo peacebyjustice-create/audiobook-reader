@@ -3,6 +3,8 @@ export interface AudioEngine {
   readonly currentMs: number
   readonly durationMs: number
   readonly paused: boolean
+  /** 재생할 수 없을 때 사용자에게 보여 줄 문장. 정상이면 null */
+  readonly error: string | null
   playbackRate: number
   play(): Promise<void>
   pause(): void
@@ -15,6 +17,7 @@ export interface AudioEngine {
 export class FakeAudioEngine implements AudioEngine {
   currentMs = 0
   paused = true
+  error: string | null = null
   playbackRate = 1
   durationMs: number
   private listeners = new Set<() => void>()

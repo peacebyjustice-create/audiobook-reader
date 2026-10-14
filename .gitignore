@@ -29,3 +29,6 @@ samples/
 *.mp3
 *.m4a
 *.srt
+
+# 로컬 변환 시험 파일 — 커밋 금지
+local-fixtures/

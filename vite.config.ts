@@ -6,25 +6,28 @@ import { defineConfig, type Plugin } from 'vite'
 const MIME: Record<string, string> = {
   mp3: 'audio/mpeg',
   m4a: 'audio/mp4',
+  m4b: 'audio/mp4',
   srt: 'text/plain; charset=utf-8',
   vtt: 'text/vtt; charset=utf-8',
   md: 'text/markdown; charset=utf-8',
   txt: 'text/plain; charset=utf-8',
 }
 
-/** 개발 전용: /samples/* 를 samples 심볼릭 링크에서 HTTP Range로 서빙(NFR-10 픽스처 로더). 빌드에는 포함되지 않음 */
+/**
+ * 개발 전용: /samples/* 를 HTTP Range로 서빙(NFR-10 픽스처 로더). 빌드에는 포함되지 않음.
+ * local-fixtures/(직접 변환한 시험 파일)를 먼저 찾고, 없으면 samples 심볼릭 링크에서 찾음
+ */
 function samplesPlugin(): Plugin {
-  const link = join(import.meta.dirname, 'samples')
+  const dirs = ['local-fixtures', 'samples'].map((d) => join(import.meta.dirname, d))
   return {
     name: 'samples',
     apply: 'serve',
     configureServer(server) {
-      if (!existsSync(link)) return
-      const root = realpathSync(link)
+      const roots = dirs.filter((d) => existsSync(d)).map((d) => realpathSync(d))
       server.middlewares.use('/samples/', (req, res, next) => {
         const rel = decodeURIComponent((req.url ?? '').split('?')[0]).replace(/^\/+/, '')
-        const file = join(root, rel)
-        if (!file.startsWith(root + sep) || !existsSync(file)) return next()
+        const file = roots.map((r) => join(r, rel)).find((f) => roots.some((r) => f.startsWith(r + sep)) && existsSync(f))
+        if (!file) return next()
         const { size } = statSync(file)
         res.setHeader('Accept-Ranges', 'bytes')
         res.setHeader('Content-Type', MIME[file.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream')
