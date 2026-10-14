@@ -2,7 +2,7 @@
 import type { Alignment } from '../core/align'
 import type { Book } from '../core/book'
 import { bookChapters, srtChapters, type Chapter } from '../core/chapters'
-import { baseName, classifyFile } from '../core/classify'
+import { baseName, classifyFile, pickBookFile } from '../core/classify'
 import { parseMarkdown } from '../core/markdown'
 import { detectLang } from '../core/normalize'
 import { parsePlainText } from '../core/plaintext'
@@ -14,6 +14,8 @@ import { loadAudio, opfsSupported, storeAudio } from '../io/opfs'
 import { probeMp3 } from '../io/probeAudio'
 import { bookId, getMeta, getTexts, patchMeta, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
 import { alignInWorker } from '../workers/alignClient'
+
+const LANG_NAME = { en: '영어', ko: '한국어' } as const
 
 /** 정렬된 큐 비율이 이보다 낮으면 책 모드 대신 자막 보기로(Q19 수동 전환의 자동 안전장치) */
 const MIN_MATCHED_RATIO = 0.5
@@ -41,8 +43,8 @@ const PANDOC_HINT =
 export async function addFromFiles(files: File[]): Promise<LoadedBook> {
   const audio = files.find((f) => classifyFile(f.name, f.type) === 'audio')
   const sub = files.find((f) => classifyFile(f.name, f.type) === 'subtitle')
-  const bookFile = files.find((f) => classifyFile(f.name, f.type) === 'book')
   if (!audio || !sub) throw new Error('오디오 파일 1개와 자막(.srt/.vtt) 1개를 함께 골라 주세요. 책(md/txt)은 선택입니다.')
+  const bookFile = pickBookFile(audio.name, files.filter((f) => classifyFile(f.name, f.type) === 'book'))
   const ext = bookFile?.name.toLowerCase().split('.').pop()
   if (ext === 'epub' || ext === 'pdf') throw new Error(PANDOC_HINT)
   const texts: BookTexts = {
@@ -138,7 +140,9 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
         const timeline = bookTimeline(book, cues, alignment)
         return { ...base, book, alignment, timeline, chapters: bookChapters(book, timeline, cues), notice: null }
       }
-      return srtMode(base, `책과 자막이 잘 맞지 않아(매칭 ${Math.round(ratio * 100)}%) 자막 보기로 엽니다.`)
+      const subLang = detectLang(cues.slice(0, 500).map((c) => c.text).join(' '))
+      const why = subLang !== alignment.lang ? ` 책은 ${LANG_NAME[alignment.lang]}, 자막은 ${LANG_NAME[subLang]}입니다. 같은 언어의 책 파일을 넣어 주세요(번역본은 맞출 수 없습니다).` : ''
+      return srtMode(base, `책 원문과 자막이 잘 맞지 않아 자막 보기로 엽니다(자막 줄 중 책에 맞춘 비율 ${Math.round(ratio * 100)}%).${why}`)
     } catch (e) {
       return srtMode(base, `책 정렬에 실패해 자막 보기로 엽니다: ${(e as Error).message}`)
     }

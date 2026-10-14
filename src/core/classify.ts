@@ -15,6 +15,19 @@ export function classifyFile(name: string, mime = ''): FileKind {
   return 'unknown'
 }
 
+/**
+ * 책 파일이 여러 개면 오디오와 이름이 같은 것을 고름(예: 'X-guide.md'와 번역본 'X-guide-ko.md'가 함께 있을 때).
+ * 이름이 같은 게 없으면 오디오 이름으로 시작하는 것, 그다음 이름이 짧은 것
+ */
+export function pickBookFile<T extends { name: string }>(audioName: string, books: readonly T[]): T | undefined {
+  const base = baseName(audioName).toLowerCase()
+  const score = (f: T) => {
+    const b = baseName(f.name).toLowerCase()
+    return b === base ? 0 : b.startsWith(base) ? 1 : 2
+  }
+  return [...books].sort((x, y) => score(x) - score(y) || x.name.length - y.name.length)[0]
+}
+
 /** 같은 책인지 판별용 이름: 확장자를 뗀 파일명 */
 export function baseName(name: string): string {
   return name.replace(/\.[^.]+$/, '')
