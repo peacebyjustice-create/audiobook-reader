@@ -13,8 +13,8 @@
 - 구조: `src/core`(순수 TS: srt 파서, navigation, player, timeline, repeat(구간반복 상태 기계), AudioEngine+Fake, markdown/plaintext → book, sentences, normalize+spokenEn, align, alignEval), `src/audio`(HtmlAudioEngine), `src/io`(텍스트 디코딩), `src/workers`(정렬 Web Worker + 클라이언트), `src/io/store.ts`(IndexedDB: 진도 meta와 원문 text를 키 분리, 쓰기는 한 줄로 직렬화), `src/reader`(openBook·Reader·BookView), `src/library`, `src/diag`(#diag, 톤 파일은 `sh scripts/make-tone.sh [초]` → local-fixtures/).
 - 정렬 리포트: `npx tsx scripts/align-report.ts [--all | --n 30 | 파일명…]`, 한 권 디버그: `scripts/align-debug.ts`(샘플 글이 출력되므로 결과를 커밋하지 말 것).
 - 정렬 알려진 한계: 표를 낭독기가 다른 순서로 재구성해 읽으면 그 부분은 오디오 전용으로 빠짐. md에 없는 연습문제(Exercise) 질문은 오디오 전용이 정답. 낭독기 안내 문구는 `align.ts`의 DEFAULT_AUDIO_ONLY(_PHRASES). 한국어 경로는 실제 데이터로 아직 검증 안 됨.
-- 배경 자료: `PRD_질문지.md`(질문·답변 기록, 0-3 샘플 분석, 3장 메모리, 4장 리스크 R1~R7), `docs/리서치_원자료.json`(출처 URL).
-- 샘플: `외장 디스크의 샘플 폴더` (영어 Shortform 가이드 1,415세트, ElevenLabs TTS, CBR mp3, 원문 거의 그대로 낭독). 읽기 전용으로만 사용.
+- 배경 자료(로컬 전용, .gitignore — 공개 저장소에는 없음): `PRD_질문지.md`(질문·답변 기록, 0-3 샘플 분석, 3장 메모리, 4장 리스크 R1~R7), `docs/리서치_원자료.json`(출처 URL).
+- 샘플: `외장 디스크의 샘플 폴더`(실제 경로는 `readlink samples`) (영어 Shortform 가이드 1,415세트, ElevenLabs TTS, CBR mp3, 원문 거의 그대로 낭독). 읽기 전용으로만 사용.
 - Mac 개발 환경: node 25, git, ffmpeg/ffprobe 7, Homebrew, python3.12. pandoc 없음.
 
 ## 확정 사항 요약
