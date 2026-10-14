@@ -36,3 +36,7 @@ local-fixtures/
 # 개인 계획 문서(로컬에만 보관, 공개 저장소에 올리지 않음)
 PRD_질문지.md
 docs/
+
+# Playwright 결과물
+test-results/
+playwright-report/

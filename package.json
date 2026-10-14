@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "report": "tsx scripts/align-report.ts"
+    "report": "tsx scripts/align-report.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "idb-keyval": "^6.3.0",
