@@ -2,6 +2,7 @@ import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 const MIME: Record<string, string> = {
   mp3: 'audio/mpeg',
@@ -57,5 +58,33 @@ function samplesPlugin(): Plugin {
 export default defineConfig({
   // GitHub Pages는 /<저장소 이름>/ 아래에서 서빙됨(배포 워크플로가 BASE_PATH를 넘김)
   base: process.env.BASE_PATH ?? '/',
-  plugins: [react(), samplesPlugin()],
+  plugins: [
+    react(),
+    samplesPlugin(),
+    // 설치형 앱·오프라인(F21, NFR-05): 앱 코드만 캐시하고 미디어 파일은 캐시하지 않음
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: '오디오북리더',
+        short_name: '오디오북리더',
+        description: '낭독 오디오에 맞춰 책 원문 문장을 강조하고 구간반복하는 리더',
+        lang: 'ko',
+        start_url: '.',
+        scope: '.',
+        display: 'standalone',
+        background_color: '#fdfcf8',
+        theme_color: '#3a6ea5',
+        icons: [
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        navigateFallback: 'index.html',
+      },
+    }),
+  ],
 })
