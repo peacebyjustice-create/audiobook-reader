@@ -1,15 +1,16 @@
 // 파일 → 저장 → 파싱·정렬 → 리더에 넘길 묶음
 import type { Alignment } from '../core/align'
-import type { Book } from '../core/book'
 import { bookChapters, srtChapters, type Chapter } from '../core/chapters'
 import { baseName, classifyFile, pickBookFile } from '../core/classify'
+import { buildBook, type BlockInput, type Book } from '../core/book'
+import { parseEpub } from '../core/epub'
 import { parseMarkdown } from '../core/markdown'
 import { detectLang } from '../core/normalize'
 import { parsePlainText } from '../core/plaintext'
 import { parseSrt, type Cue } from '../core/srt'
 import { bookTimeline, cueTimeline, type Timeline } from '../core/timeline'
 import type { Mp3Scan } from '../core/mp3scan'
-import { readTextFile } from '../io/decodeText'
+import { readBookBytes, readTextFile } from '../io/decodeText'
 import { loadAudio, opfsSupported, storeAudio } from '../io/opfs'
 import { probeMp3 } from '../io/probeAudio'
 import { bookId, getMeta, getTexts, patchMeta, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
@@ -36,22 +37,22 @@ export interface LoadedBook {
   notice: string | null
 }
 
-const PANDOC_HINT =
-  'EPUB은 PC에서 md로 바꿔 넣어 주세요: pandoc 책.epub -t gfm -o 책.md  (PDF는 calibre의 ebook-convert로 txt 변환)'
+const PDF_HINT = 'PDF는 아직 직접 읽지 못합니다. PC에서 txt로 바꿔 넣어 주세요: calibre의 ebook-convert 책.pdf 책.txt'
 
-/** 새 책 추가: 오디오 1개 + 자막 1개 + (선택) 책 md/txt 1개 */
+/** 새 책 추가: 오디오 1개 + 자막 1개 + (선택) 책 md/txt/epub 1개 */
 export async function addFromFiles(files: File[]): Promise<LoadedBook> {
   const audio = files.find((f) => classifyFile(f.name, f.type) === 'audio')
   const sub = files.find((f) => classifyFile(f.name, f.type) === 'subtitle')
-  if (!audio || !sub) throw new Error('오디오 파일 1개와 자막(.srt/.vtt) 1개를 함께 골라 주세요. 책(md/txt)은 선택입니다.')
+  if (!audio || !sub) throw new Error('오디오 파일 1개와 자막(.srt/.vtt) 1개를 함께 골라 주세요. 책(md/txt/epub)은 선택입니다.')
   const bookFile = pickBookFile(audio.name, files.filter((f) => classifyFile(f.name, f.type) === 'book'))
   const ext = bookFile?.name.toLowerCase().split('.').pop()
-  if (ext === 'epub' || ext === 'pdf') throw new Error(PANDOC_HINT)
+  if (ext === 'pdf') throw new Error(PDF_HINT)
+  const format: BookMeta['bookFormat'] = !bookFile ? null : ext === 'txt' ? 'txt' : ext === 'epub' ? 'epub' : 'md'
   const texts: BookTexts = {
     srtText: (await readTextFile(sub)).text,
-    bookText: bookFile ? (await readTextFile(bookFile)).text : null,
+    bookText: !bookFile ? null : format === 'epub' ? JSON.stringify(parseEpub(await readBookBytes(bookFile)).blocks) : (await readTextFile(bookFile)).text,
   }
-  const meta = await upsert(bookId(audio.name, audio.size), baseName(audio.name), audio.name, audio.size, texts, bookFile ? (ext === 'txt' ? 'txt' : 'md') : null)
+  const meta = await upsert(bookId(audio.name, audio.size), baseName(audio.name), audio.name, audio.size, texts, format)
   const mp3 = await probeMp3(audio, audio.name)
   keepInApp(meta, audio)
   const url = URL.createObjectURL(audio)
@@ -131,7 +132,12 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
   if (!cues.length) throw new Error('자막에서 큐를 찾지 못했습니다.')
   const base = { meta, cues, audioUrl, revoke, mp3 }
   if (texts.bookText && !meta.forceSrt) {
-    const book = meta.bookFormat === 'txt' ? parsePlainText(texts.bookText) : parseMarkdown(texts.bookText)
+    const book =
+      meta.bookFormat === 'txt'
+        ? parsePlainText(texts.bookText)
+        : meta.bookFormat === 'epub'
+          ? buildBook(JSON.parse(texts.bookText) as BlockInput[])
+          : parseMarkdown(texts.bookText)
     try {
       const alignment = await alignInWorker(book, cues, meta.tolerance, meta.anchors)
       const ratio = alignment.stats.matchedCues / Math.max(1, alignment.stats.cues)

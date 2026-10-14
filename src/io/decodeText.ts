@@ -18,6 +18,16 @@ export function decodeBytes(bytes: Uint8Array): { text: string; encoding: TextEn
   }
 }
 
+/** EPUB 등 압축 책 파일 상한(그림이 많아 큼. 글자 문서만 압축을 풂) */
+export const BOOK_BINARY_LIMIT_BYTES = 200 * 1024 * 1024
+
+/** 책 파일(EPUB) 바이트. 오디오에는 쓰지 않음(CLAUDE.md 금지 규칙) */
+export async function readBookBytes(file: Blob & { name?: string }): Promise<Uint8Array> {
+  if (file.name && classifyFile(file.name, file.type) === 'audio') throw new Error('오디오 파일은 책으로 읽지 않습니다')
+  if (file.size > BOOK_BINARY_LIMIT_BYTES) throw new Error(`책 파일이 너무 큽니다(상한 200MB): ${Math.round(file.size / 1e6)}MB`)
+  return new Uint8Array(await file.arrayBuffer())
+}
+
 export async function readTextFile(file: Blob & { name?: string }): Promise<{ text: string; encoding: TextEncoding }> {
   if (file.name && classifyFile(file.name, file.type) === 'audio') throw new Error('오디오 파일은 텍스트로 읽지 않습니다')
   if (file.size > TEXT_LIMIT_BYTES) throw new Error(`텍스트 파일이 너무 큽니다(상한 50MB): ${file.size} bytes`)

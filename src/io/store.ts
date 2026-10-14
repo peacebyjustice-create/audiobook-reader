@@ -22,7 +22,8 @@ export interface BookMeta {
   title: string
   audioName: string
   audioSize: number
-  bookFormat: 'md' | 'txt' | null
+  /** epub이면 bookText는 해석한 블록의 JSON(추가할 때 한 번만 해석) */
+  bookFormat: 'md' | 'txt' | 'epub' | null
   createdAt: number
   updatedAt: number
   positionMs: number

@@ -4,6 +4,10 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { alignBook } from './align'
 import { evaluate } from './alignEval'
+import { Marked } from 'marked'
+import { buildBook } from './book'
+import { parseEpub } from './epub'
+import { makeEpub } from './epubFixture'
 import { parseMarkdown } from './markdown'
 import { parseSrt } from './srt'
 
@@ -55,5 +59,25 @@ describe.skipIf(srts.length === 0)('샘플 책 정렬(AC-1·AC-2)', () => {
     console.log(`샘플 ${picked.size}권, 본문 큐 ${body}개, 올바른 위치 ${((100 * correct) / body).toFixed(2)}%`)
     expect(correct / body).toBeGreaterThanOrEqual(0.98)
     expect(introOutro / picked.size).toBeGreaterThanOrEqual(0.95)
+  }, 120_000)
+})
+
+// EPUB 경로 검증: 가이드 md를 HTML로 바꿔 EPUB으로 묶고, 같은 자막과 정렬해 md와 같은 정확도인지 확인
+describe.skipIf(srts.length === 0)('샘플을 EPUB으로 바꿔 정렬', () => {
+  it('md로 정렬할 때와 올바른 위치 비율 차이 1%p 이내', () => {
+    const names = srts.map((f) => f.replace(/\.srt$/, '')).filter((n) => existsSync(join(DIR, n + '.md')))
+    const step = Math.max(1, Math.floor(names.length / 10))
+    const marked = new Marked()
+    for (const name of names.filter((_, i) => i % step === 0).slice(0, 10)) {
+      const md = readFileSync(join(DIR, name + '.md'), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').replace(/^---(#{1,6}\s)/gm, '\n---\n\n$1')
+      // 장(## 제목)마다 XHTML 문서 하나로 나눔
+      const chapters = md.split(/\n(?=## )/).map((part, i) => ({ file: `c${i}.xhtml`, html: marked.parse(part, { async: false }) as string }))
+      const xhtml = chapters.map((c) => ({ ...c, html: c.html.replace(/<br>/g, '<br/>').replace(/<hr>/g, '<hr/>').replace(/<img([^>]*?)>/g, '<img$1/>') }))
+      const epubBook = buildBook(parseEpub(makeEpub(xhtml)).blocks)
+      const { cues } = parseSrt(readFileSync(join(DIR, name + '.srt'), 'utf8'))
+      const viaMd = evaluate(parseMarkdown(readFileSync(join(DIR, name + '.md'), 'utf8')), cues, alignBook(parseMarkdown(readFileSync(join(DIR, name + '.md'), 'utf8')), cues))
+      const viaEpub = evaluate(epubBook, cues, alignBook(epubBook, cues))
+      expect(viaEpub.correctRatio, name).toBeGreaterThan(viaMd.correctRatio - 0.01)
+    }
   }, 120_000)
 })

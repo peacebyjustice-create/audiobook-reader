@@ -91,7 +91,7 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
 
       {books && books.length === 0 && (
         <section className="empty">
-          <p>낭독 오디오(mp3·m4a)와 자막(.srt), 책 원문(md·txt)을 한꺼번에 골라 주세요.</p>
+          <p>낭독 오디오(mp3·m4a)와 자막(.srt), 책 원문(md·txt·epub)을 한꺼번에 골라 주세요.</p>
           <p>책 원문이 없으면 자막을 본문처럼 보여 줍니다.</p>
         </section>
       )}
