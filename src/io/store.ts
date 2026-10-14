@@ -1,5 +1,6 @@
 // 기기 안 저장소(IndexedDB, idb-keyval). 오디오는 저장하지 않음(Q33 A): 자막·책 글과 진도만.
 import { createStore, del, entries, get, set } from 'idb-keyval'
+import type { ManualAnchor, Tolerance } from '../core/align'
 import { DEFAULT_REPEAT, type RepeatSettings } from '../core/repeat'
 
 const db = createStore('audiobook-reader', 'kv')
@@ -28,6 +29,12 @@ export interface BookMeta {
   offsetMs: number
   rate: number
   bookmarks: Bookmark[]
+  /** 정렬 허용치(Q19 D). 없으면 보통 */
+  tolerance?: Tolerance
+  /** 수동 앵커(F16): 다시 정렬해도 유지되는 '제약' */
+  anchors?: ManualAnchor[]
+  /** 책이 있어도 자막 보기로 보기(Q19 수동 전환) */
+  forceSrt?: boolean
 }
 
 /** 자막·책 원문(크고 거의 안 바뀜) */

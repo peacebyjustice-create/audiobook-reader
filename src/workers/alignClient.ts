@@ -1,4 +1,4 @@
-import type { Alignment, Tolerance } from '../core/align'
+import type { Alignment, ManualAnchor, Tolerance } from '../core/align'
 import type { Book } from '../core/book'
 import type { Cue } from '../core/srt'
 import type { AlignRequest, AlignResponse } from './align.worker'
@@ -27,11 +27,11 @@ function getWorker(): Worker {
 }
 
 /** Web Worker에서 책 정렬 */
-export function alignInWorker(book: Book, cues: Cue[], tolerance?: Tolerance): Promise<Alignment> {
+export function alignInWorker(book: Book, cues: Cue[], tolerance?: Tolerance, anchors?: ManualAnchor[]): Promise<Alignment> {
   const id = nextId++
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject })
-    const req: AlignRequest = { id, book, cues, tolerance }
+    const req: AlignRequest = { id, book, cues, tolerance, anchors }
     getWorker().postMessage(req)
   })
 }

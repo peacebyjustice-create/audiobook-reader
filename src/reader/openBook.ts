@@ -11,7 +11,7 @@ import { bookTimeline, cueTimeline, type Timeline } from '../core/timeline'
 import type { Mp3Scan } from '../core/mp3scan'
 import { readTextFile } from '../io/decodeText'
 import { probeMp3 } from '../io/probeAudio'
-import { bookId, getMeta, getTexts, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
+import { bookId, getMeta, getTexts, patchMeta, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
 import { alignInWorker } from '../workers/alignClient'
 
 /** 정렬된 큐 비율이 이보다 낮으면 책 모드 대신 자막 보기로(Q19 수동 전환의 자동 안전장치) */
@@ -87,16 +87,25 @@ async function upsert(id: string, title: string, audioName: string, audioSize: n
   return meta
 }
 
+/** 허용치·앵커·보기 방식을 바꿔 다시 정렬. 오디오(URL)는 그대로 씀 */
+export async function realign(loaded: LoadedBook, patch: Pick<Partial<BookMeta>, 'tolerance' | 'anchors' | 'forceSrt'>): Promise<LoadedBook> {
+  const meta = (await patchMeta(loaded.meta.id, patch)) ?? { ...loaded.meta, ...patch }
+  const texts = await getTexts(meta.id)
+  if (!texts) throw new Error('저장된 자막을 찾지 못했습니다.')
+  return prepare(meta, texts, loaded.audioUrl, loaded.revoke, loaded.mp3)
+}
+
 async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revoke?: () => void, mp3: Mp3Scan | null = null): Promise<LoadedBook> {
   const { cues } = parseSrt(texts.srtText)
   if (!cues.length) throw new Error('자막에서 큐를 찾지 못했습니다.')
   const base = { meta, cues, audioUrl, revoke, mp3 }
-  if (texts.bookText) {
+  if (texts.bookText && !meta.forceSrt) {
     const book = meta.bookFormat === 'txt' ? parsePlainText(texts.bookText) : parseMarkdown(texts.bookText)
     try {
-      const alignment = await alignInWorker(book, cues)
+      const alignment = await alignInWorker(book, cues, meta.tolerance, meta.anchors)
       const ratio = alignment.stats.matchedCues / Math.max(1, alignment.stats.cues)
-      if (ratio >= MIN_MATCHED_RATIO) {
+      // 사용자가 허용치·앵커를 정했으면 매칭률이 낮아도 책 모드 유지
+      if (ratio >= MIN_MATCHED_RATIO || meta.tolerance || meta.anchors?.length) {
         const timeline = bookTimeline(book, cues, alignment)
         return { ...base, book, alignment, timeline, chapters: bookChapters(book, timeline, cues), notice: null }
       }

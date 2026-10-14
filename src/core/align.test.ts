@@ -103,6 +103,30 @@ describe('alignBook (합성)', () => {
     expect(al.sentences[0].startMs).toBe(cues[0].startMs)
   })
 
+  it('수동 앵커: 그 문장은 정한 시각에서 시작하고, 앞뒤 문장 시각은 앵커를 넘지 않음', () => {
+    const cues = narrate(book, {})
+    const base = alignBook(book, cues)
+    const target = 40
+    const ms = base.sentences[target].startMs + 700
+    const al = alignBook(book, cues, { anchors: [{ sentence: target, ms }] })
+    expect(al.sentences[target].startMs).toBe(ms)
+    for (let i = 0; i < target; i++) expect(al.sentences[i].startMs).toBeLessThanOrEqual(ms)
+    for (let i = target + 1; i < al.sentences.length; i++) expect(al.sentences[i].startMs).toBeGreaterThanOrEqual(ms)
+    expect(al.stats.audioOnlyCues).toBe(0)
+  })
+
+  it('수동 앵커: 낭독 안 된 문장도 앵커를 두면 시각이 생김, 순서가 엇갈린 앵커는 버림', () => {
+    const skip = [5]
+    const cues = narrate(book, { skipBlocks: skip })
+    const s = book.sentences.findIndex((x) => x.block === 5)
+    const before = alignBook(book, cues).sentences[s]
+    expect(before.startMs).toBe(-1)
+    const ms = alignBook(book, cues).sentences[s - 1].endMs
+    const al = alignBook(book, cues, { anchors: [{ sentence: s, ms }, { sentence: 2, ms: ms + 5000 }] })
+    expect(al.sentences[s].startMs).toBe(ms)
+    expect(al.sentences[2].startMs).toBeLessThan(ms)
+  })
+
   it('입력 상한을 넘으면 거부', () => {
     const big = buildBook([{ kind: 'text', text: 'a'.repeat(2_000_001) }])
     expect(() => alignBook(big, [])).toThrow(/상한/)

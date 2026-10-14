@@ -515,3 +515,13 @@ button {
   color: var(--accent);
   font-weight: 600;
 }
+
+.link-inline {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+}

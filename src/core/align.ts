@@ -36,6 +36,13 @@ export interface AlignOptions {
   lang?: Lang
   audioOnlyPatterns?: readonly RegExp[]
   audioOnlyPhrases?: readonly RegExp[]
+  /** 사용자 보정(F16 '지금 재생 위치에 맞추기'): 책 문장 s는 글자 시각 ms에서 시작. 다시 정렬해도 유지 */
+  anchors?: readonly ManualAnchor[]
+}
+
+export interface ManualAnchor {
+  sentence: number
+  ms: number
 }
 
 export interface CueMatch {
@@ -103,7 +110,20 @@ export function alignBook(book: Book, cues: readonly Cue[], opts: AlignOptions =
   const cueOf = new Int32Array(B.length)
   for (let k = 0; k < cues.length; k++) cueOf.fill(k, cueStartB[k], cueEndB[k])
 
-  const matchBA = matchChars(A.norm, B)
+  // 수동 앵커: 책 문장 시작 ↔ 그 시각의 전사 위치를 고정점으로 삼아 구간을 나눠 정렬
+  const anchorPoints: [number, number][] = []
+  const anchorMs = new Map<number, number>()
+  for (const an of [...(opts.anchors ?? [])].sort((x, y) => x.ms - y.ms)) {
+    const s = book.sentences[an.sentence]
+    if (!s || !cues.length) continue
+    const a = normIndexAtOrAfter(A.map, s.start)
+    const b = transcriptPosAt(cues, cueStartB, cueEndB, an.ms)
+    const last = anchorPoints.at(-1)
+    if (last && (a <= last[0] || b < last[1])) continue // 순서가 엇갈리는 앵커는 버림
+    anchorPoints.push([a, b])
+    anchorMs.set(an.sentence, an.ms)
+  }
+  const matchBA = matchChars(A.norm, B, anchorPoints)
   const matchAB = new Int32Array(A.norm.length).fill(-1)
   for (let b = 0; b < B.length; b++) if (matchBA[b] >= 0) matchAB[matchBA[b]] = b
 
@@ -142,7 +162,8 @@ export function alignBook(book: Book, cues: readonly Cue[], opts: AlignOptions =
     return Math.round(cue.startMs + ((cue.endMs - cue.startMs) * pos) / len)
   }
   let prevStart = 0
-  const sentences: SentenceTiming[] = book.sentences.map((s) => {
+  const sentences: SentenceTiming[] = book.sentences.map((s, si) => {
+    const pinned = anchorMs.get(si)
     const na = normIndexAtOrAfter(A.map, s.start)
     const nb = normIndexAtOrAfter(A.map, s.end)
     let count = 0
@@ -155,7 +176,13 @@ export function alignBook(book: Book, cues: readonly Cue[], opts: AlignOptions =
       if (firstB < 0) firstB = b
       lastB = b
     }
-    if (count === 0 || count < Math.min(3, nb - na) || count / (nb - na) < SENTENCE_MIN_RATIO) return { startMs: -1, endMs: -1 }
+    const narrated = count > 0 && count >= Math.min(3, nb - na) && count / (nb - na) >= SENTENCE_MIN_RATIO
+    if (pinned !== undefined) {
+      // 앵커 문장은 사용자가 정한 시각에서 시작(낭독 판정과 무관)
+      prevStart = pinned
+      return { startMs: pinned, endMs: narrated ? Math.max(pinned, timeAt(lastB, 'end')) : pinned + 2000 }
+    }
+    if (!narrated) return { startMs: -1, endMs: -1 }
     const startMs = Math.max(prevStart, timeAt(firstB, 'start'))
     prevStart = startMs
     return { startMs, endMs: Math.max(startMs, timeAt(lastB, 'end')) }
@@ -187,9 +214,18 @@ export function alignBook(book: Book, cues: readonly Cue[], opts: AlignOptions =
  * 두 정규화 문자열의 단조 증가 글자 대응. 반환값 m[b] = a (없으면 -1)
  * 고유 n-gram 앵커 + LIS로 큰 뼈대를 잡고(R1 2·3단계), 작아진 구간은 LCS로 마무리(4단계)
  */
-export function matchChars(A: string, B: string): Int32Array {
+export function matchChars(A: string, B: string, fixed: readonly [number, number][] = []): Int32Array {
   const m = new Int32Array(B.length).fill(-1)
-  const stack: [number, number, number, number, number][] = [[0, A.length, 0, B.length, 0]]
+  // 고정점(수동 앵커)으로 나눈 구간들을 따로 정렬. 고정점은 오름차순이어야 함
+  const stack: [number, number, number, number, number][] = []
+  let pa = 0
+  let pb = 0
+  for (const [a, b] of fixed) {
+    stack.push([pa, a, pb, b, 0])
+    pa = a
+    pb = b
+  }
+  stack.push([pa, A.length, pb, B.length, 0])
   while (stack.length) {
     const [a0, a1, b0, b1, ni] = stack.pop()!
     const la = a1 - a0
@@ -219,6 +255,16 @@ export function matchChars(A: string, B: string): Int32Array {
   }
   dropShortRuns(m, MIN_RUN)
   return m
+}
+
+/** 글자 시각 ms에 해당하는 전사 문자열 위치(큐 안은 글자 비율로 보간) */
+function transcriptPosAt(cues: readonly Cue[], startB: Int32Array, endB: Int32Array, ms: number): number {
+  let k = 0
+  while (k + 1 < cues.length && cues[k + 1].startMs <= ms) k++
+  const c = cues[k]
+  const len = endB[k] - startB[k]
+  const r = c.endMs > c.startMs ? Math.min(1, Math.max(0, (ms - c.startMs) / (c.endMs - c.startMs))) : 0
+  return startB[k] + Math.round(r * len)
 }
 
 const HASH_P = 0x01000193

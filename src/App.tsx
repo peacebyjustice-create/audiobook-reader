@@ -46,6 +46,19 @@ export default function App() {
     setSession(s)
   }
 
+  /** 다시 정렬한 결과로 바꿈: 오디오 엔진(재생 위치)은 그대로 두고 플레이어·반복만 새로 만듦 */
+  const replace = (loaded: LoadedBook) => {
+    const old = sessionRef.current
+    if (!old) return open(loaded)
+    old.repeat.dispose()
+    const player = new Player(old.engine, loaded.timeline.segments)
+    player.offsetMs = old.player.offsetMs
+    const repeat = new RepeatController(player, settings.repeat)
+    const s = { loaded, engine: old.engine, player, repeat }
+    sessionRef.current = s
+    setSession(s)
+  }
+
   useEffect(() => {
     void getSettings().then((st) => {
       setSettings(st)
@@ -69,7 +82,7 @@ export default function App() {
         <Diag />
       </Suspense>
     )
-  if (session) return <Reader key={session.loaded.meta.id} session={session} settings={settings} onSettings={updateSettings} onClose={close} />
+  if (session) return <Reader key={session.loaded.meta.id} session={session} settings={settings} onSettings={updateSettings} onClose={close} onReplace={replace} />
   return (
     <>
       {error && <p className="error">{error}</p>}

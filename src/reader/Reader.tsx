@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { HtmlAudioEngine } from '../audio/htmlAudioEngine'
 import type { Player } from '../core/player'
+import type { Tolerance } from '../core/align'
 import type { RepeatController, RepeatState } from '../core/repeat'
 import { formatTime } from '../format'
 import { patchMeta, type Bookmark, type BookMeta, type Settings } from '../io/store'
 import { chapterAt } from '../core/chapters'
 import { useEngine } from '../useEngine'
 import { BookView } from './BookView'
-import type { LoadedBook } from './openBook'
+import { realign, type LoadedBook } from './openBook'
 import { Sheet } from './Sheet'
 import { useMediaSession } from './useMediaSession'
 
@@ -31,23 +32,42 @@ function useRepeatState(repeat: RepeatController): RepeatState {
   )
 }
 
-type Menu = null | { kind: 'more' } | { kind: 'toc' } | { kind: 'sentence'; seg: number; sent: number | null }
+type Menu = null | { kind: 'more' } | { kind: 'toc' } | { kind: 'report' } | { kind: 'sentence'; seg: number; sent: number | null }
 
 export function Reader({
   session,
   settings,
   onSettings,
   onClose,
+  onReplace,
 }: {
   session: ReaderSession
   settings: Settings
   onSettings: (s: Settings) => void
   onClose: () => void
+  onReplace: (l: LoadedBook) => void
 }) {
   const { loaded, engine, player, repeat } = session
   const { timeline, chapters } = loaded
   const snap = useEngine(engine)
   const rep = useRepeatState(repeat)
+  const [busy, setBusy] = useState('')
+  /** 허용치·앵커·보기 방식을 바꿔 다시 정렬(F16·F17) */
+  const redo = async (label: string, patch: Parameters<typeof realign>[1]) => {
+    setMenu(null)
+    setBusy(label)
+    try {
+      onReplace(await realign(loaded, patch))
+    } catch (e) {
+      setToast({ text: (e as Error).message, backTo: -1 })
+    } finally {
+      setBusy('')
+    }
+  }
+  const anchorHere = (sent: number) => {
+    const anchors = [...(loaded.meta.anchors ?? []).filter((a) => a.sentence !== sent), { sentence: sent, ms: Math.round(player.textTime()) }]
+    void redo('이 문장을 지금 위치에 맞춰 다시 정렬하는 중…', { anchors })
+  }
   const [meta, setMeta] = useState<BookMeta>(loaded.meta)
   const [following, setFollowing] = useState(true)
   const [menu, setMenu] = useState<Menu>(null)
@@ -122,7 +142,7 @@ export function Reader({
     }
     settle()
     return () => cancelAnimationFrame(raf)
-  }, [current, following])
+  }, [current, following, loaded])
 
   // 반복 구간 표시
   useEffect(() => {
@@ -132,7 +152,7 @@ export function Reader({
     if (rep.mode === 'armed') root.querySelector(`[data-seg="${rep.start}"]`)?.classList.add('loop-start')
     if (rep.mode === 'loop')
       for (let i = rep.start; i <= rep.end; i++) root.querySelector(`[data-seg="${i}"]`)?.classList.add('in-loop')
-  }, [rep])
+  }, [rep, loaded])
 
   // 손으로 스크롤하면 자동 추적 멈춤(FR-09)
   useEffect(() => {
@@ -280,6 +300,7 @@ export function Reader({
       </header>
 
       {loaded.notice && <p className="notice">{loaded.notice}</p>}
+      {busy && <p className="notice">{busy}</p>}
       {snap.error && <p className="error">{snap.error}</p>}
       {vbr && (
         <p className="error">
@@ -394,8 +415,52 @@ export function Reader({
             onTo={() => repeat.repeatTo(menu.seg)}
             onBookmark={() => menu.seg >= 0 && addBookmark(menu.seg, player.audioStart(menu.seg))}
             onCopy={() => void navigator.clipboard?.writeText(sentencePreview(loaded, menu, Infinity))}
+            onAnchor={loaded.book && menu.sent !== null ? () => anchorHere(menu.sent!) : null}
             close={() => setMenu(null)}
           />
+        </Sheet>
+      )}
+
+      {menu?.kind === 'report' && stats && (
+        <Sheet title="정렬 리포트" onClose={() => setMenu(null)}>
+          <p className="meta-info">
+            자막 {stats.cues}줄 중 {stats.matchedCues}줄 매칭({Math.round((100 * stats.matchedCues) / Math.max(1, stats.cues))}%), 낭독 문장{' '}
+            {stats.timedSentences}/{stats.sentences}, 정렬 {stats.elapsedMs}ms. 강조가 틀린 곳은 그 문장을 길게 눌러 '지금 재생 위치에 맞추기'로 고칩니다.
+          </p>
+          {(loaded.meta.anchors?.length ?? 0) > 0 && (
+            <>
+              <div className="sheet-title">수동 앵커</div>
+              <ul className="bookmarks">
+                {loaded.meta.anchors!.map((a) => (
+                  <li key={a.sentence}>
+                    <span className="link">
+                      <span className="time">{formatTime(a.ms)}</span> {sentencePreview(loaded, { seg: -1, sent: a.sentence })}
+                    </span>
+                    <button
+                      type="button"
+                      className="icon"
+                      aria-label="앵커 삭제"
+                      onClick={() => void redo('앵커를 지우고 다시 정렬하는 중…', { anchors: loaded.meta.anchors!.filter((x) => x !== a) })}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="sheet-title">오디오 전용 구간 ({timeline.segments.filter((s) => s.kind === 'audio').length})</div>
+          <ul className="bookmarks">
+            {timeline.segments.map((s, i) =>
+              s.kind !== 'audio' ? null : (
+                <li key={i}>
+                  <button type="button" className="link" disabled={seekLocked} onClick={() => jumpTo(i)}>
+                    <span className="time">{formatTime(s.startMs)}</span> {segmentText(loaded, i).slice(0, 80)}
+                  </button>
+                </li>
+              ),
+            )}
+          </ul>
         </Sheet>
       )}
 
@@ -544,10 +609,43 @@ export function Reader({
               ))}
             </ul>
           )}
+          {loaded.meta.bookFormat && (
+            <>
+              <div className="row">
+                <span>보기 방식</span>
+                <div className="seg-toggle">
+                  <button type="button" className={!loaded.meta.forceSrt ? 'on' : ''} onClick={() => loaded.meta.forceSrt && void redo('책 모드로 여는 중…', { forceSrt: false })}>
+                    책 원문
+                  </button>
+                  <button type="button" className={loaded.meta.forceSrt ? 'on' : ''} onClick={() => !loaded.meta.forceSrt && void redo('자막 보기로 바꾸는 중…', { forceSrt: true })}>
+                    자막
+                  </button>
+                </div>
+              </div>
+              {!loaded.meta.forceSrt && (
+                <div className="row">
+                  <span>정렬 허용치</span>
+                  <select
+                    value={loaded.meta.tolerance ?? 'normal'}
+                    onChange={(e) => void redo('다시 정렬하는 중…', { tolerance: e.currentTarget.value as Tolerance })}
+                  >
+                    <option value="strict">엄격(확실할 때만)</option>
+                    <option value="normal">보통</option>
+                    <option value="loose">관대(최대한 맞춤)</option>
+                  </select>
+                </div>
+              )}
+            </>
+          )}
           <p className="meta-info">
             {stats
               ? `책 모드 · 자막 ${stats.cues}줄 중 ${Math.round((100 * stats.matchedCues) / Math.max(1, stats.cues))}% 매칭 · 낭독 문장 ${stats.timedSentences}/${stats.sentences}`
-              : '자막 보기'}
+              : '자막 보기'}{' '}
+            {stats && (
+              <button type="button" className="link-inline" onClick={() => setMenu({ kind: 'report' })}>
+                정렬 리포트
+              </button>
+            )}
           </p>
         </Sheet>
       )}
@@ -562,6 +660,8 @@ function SentenceMenu(props: {
   onTo: () => void
   onBookmark: () => void
   onCopy: () => void
+  /** 책 모드에서만: 지금 재생 위치에 맞추기(F16) */
+  onAnchor: (() => void) | null
   close: () => void
 }) {
   const item = (label: string, fn: () => void, needsSeg = true) => (
@@ -584,6 +684,7 @@ function SentenceMenu(props: {
       {item('여기서부터 반복', props.onFrom)}
       {item('여기까지 반복', props.onTo)}
       {item('북마크', props.onBookmark)}
+      {props.onAnchor && item('지금 재생 위치에 맞추기', props.onAnchor, false)}
       {item('복사', props.onCopy, false)}
     </div>
   )
