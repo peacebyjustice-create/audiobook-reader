@@ -40,9 +40,11 @@ export interface Settings {
   fontSize: number
   view: 'book' | 'lyrics'
   repeat: RepeatSettings
+  /** 잠금화면·이어폰 이전/다음 단위(Q6 D, 기본 문장) */
+  remoteUnit: 'sentence' | '15s' | 'chapter'
 }
 
-export const DEFAULT_SETTINGS: Settings = { fontSize: 18, view: 'book', repeat: DEFAULT_REPEAT }
+export const DEFAULT_SETTINGS: Settings = { fontSize: 18, view: 'book', repeat: DEFAULT_REPEAT, remoteUnit: 'sentence' }
 
 export function bookId(audioName: string, audioSize: number): string {
   return `${audioName}|${audioSize}`

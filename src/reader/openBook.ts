@@ -1,6 +1,7 @@
 // 파일 → 저장 → 파싱·정렬 → 리더에 넘길 묶음
 import type { Alignment } from '../core/align'
 import type { Book } from '../core/book'
+import { bookChapters, srtChapters, type Chapter } from '../core/chapters'
 import { baseName, classifyFile } from '../core/classify'
 import { parseMarkdown } from '../core/markdown'
 import { detectLang } from '../core/normalize'
@@ -22,8 +23,8 @@ export interface LoadedBook {
   book: Book | null
   alignment: Alignment | null
   timeline: Timeline
-  /** 세그먼트마다 소속 제목(하단 바 표시용) */
-  segHeading: (string | null)[]
+  /** 목차(챕터·절) */
+  chapters: Chapter[]
   audioUrl: string
   revoke?: () => void
   /** mp3 검사 결과(VBR 감지, F23). mp3가 아니거나 검사 못 했으면 null */
@@ -97,7 +98,7 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
       const ratio = alignment.stats.matchedCues / Math.max(1, alignment.stats.cues)
       if (ratio >= MIN_MATCHED_RATIO) {
         const timeline = bookTimeline(book, cues, alignment)
-        return { ...base, book, alignment, timeline, segHeading: headingsFor(book, timeline), notice: null }
+        return { ...base, book, alignment, timeline, chapters: bookChapters(book, timeline, cues), notice: null }
       }
       return srtMode(base, `책과 자막이 잘 맞지 않아(매칭 ${Math.round(ratio * 100)}%) 자막 보기로 엽니다.`)
     } catch (e) {
@@ -109,19 +110,5 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
 
 function srtMode(base: Pick<LoadedBook, 'meta' | 'cues' | 'audioUrl' | 'revoke' | 'mp3'>, notice: string | null): LoadedBook {
   const timeline = cueTimeline(base.cues, detectLang(base.cues.slice(0, 500).map((c) => c.text).join(' ')))
-  return { ...base, book: null, alignment: null, timeline, segHeading: timeline.segments.map(() => null), notice }
-}
-
-function headingsFor(book: Book, tl: Timeline): (string | null)[] {
-  const blockHeading: (string | null)[] = []
-  let cur: string | null = null
-  for (const b of book.blocks) {
-    if (b.kind === 'heading') cur = book.text.slice(b.start, b.end)
-    blockHeading.push(cur)
-  }
-  let last: string | null = null
-  return tl.segments.map((s) => {
-    if (s.sentence !== undefined) last = blockHeading[book.sentences[s.sentence].block]
-    return last
-  })
+  return { ...base, book: null, alignment: null, timeline, chapters: srtChapters(timeline, base.cues), notice }
 }

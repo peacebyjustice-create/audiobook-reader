@@ -4,10 +4,12 @@ import type { Player } from '../core/player'
 import type { RepeatController, RepeatState } from '../core/repeat'
 import { formatTime } from '../format'
 import { patchMeta, type Bookmark, type BookMeta, type Settings } from '../io/store'
+import { chapterAt } from '../core/chapters'
 import { useEngine } from '../useEngine'
 import { BookView } from './BookView'
 import type { LoadedBook } from './openBook'
 import { Sheet } from './Sheet'
+import { useMediaSession } from './useMediaSession'
 
 export interface ReaderSession {
   loaded: LoadedBook
@@ -29,7 +31,7 @@ function useRepeatState(repeat: RepeatController): RepeatState {
   )
 }
 
-type Menu = null | { kind: 'more' } | { kind: 'sentence'; seg: number; sent: number | null }
+type Menu = null | { kind: 'more' } | { kind: 'toc' } | { kind: 'sentence'; seg: number; sent: number | null }
 
 export function Reader({
   session,
@@ -43,7 +45,7 @@ export function Reader({
   onClose: () => void
 }) {
   const { loaded, engine, player, repeat } = session
-  const { timeline, segHeading } = loaded
+  const { timeline, chapters } = loaded
   const snap = useEngine(engine)
   const rep = useRepeatState(repeat)
   const [meta, setMeta] = useState<BookMeta>(loaded.meta)
@@ -250,7 +252,22 @@ export function Reader({
 
   const repLabel = rep.mode === 'off' ? '반복' : rep.mode === 'armed' ? 'A–' : rep.start === rep.end ? '1문장' : 'A–B'
   const repCount = rep.mode === 'loop' && settings.repeat.count > 0 ? ` ${rep.done + 1}/${settings.repeat.count}` : ''
-  const heading = segHeading[current] ?? null
+  const chapterIdx = chapterAt(chapters, current)
+  const chapterLabel = (() => {
+    const c = chapters[chapterIdx]
+    if (!c) return null
+    if (c.depth === 0) return c.title
+    let p = chapterIdx
+    while (p >= 0 && chapters[p].depth !== 0) p--
+    return p >= 0 ? `${chapters[p].title} › ${c.title}` : c.title
+  })()
+  useMediaSession({ engine, player, repeat, chapters, title: meta.title, chapterTitle: chapterLabel, unit: settings.remoteUnit, seekLocked })
+  const jumpTo = (seg: number) => {
+    if (seekLocked) return lockedToast()
+    repeat.seekManual(player.audioStart(seg))
+    setFollowing(true)
+    setMenu(null)
+  }
   const stats = loaded.alignment?.stats
 
   return (
@@ -313,6 +330,11 @@ export function Reader({
       </div>
 
       <footer className="bar">
+        <div className="progress-wrap">
+          {snap.durationMs > 0 &&
+            chapters.map((c) => (
+              <span key={c.seg} className={`tick d${c.depth}`} style={{ left: `${(100 * player.audioStart(c.seg)) / snap.durationMs}%` }} />
+            ))}
         <input
           className="progress"
           type="range"
@@ -324,8 +346,11 @@ export function Reader({
           disabled={seekLocked}
           onChange={(e) => repeat.seekManual(Number(e.currentTarget.value))}
         />
+        </div>
         <div className="status">
-          <span className="chapter">{heading}</span>
+          <button type="button" className="chapter" onClick={() => setMenu({ kind: 'toc' })}>
+            {chapterLabel}
+          </button>
           <span className="time">
             {snap.error ? '--:--' : `${formatTime(snap.currentMs)} / ${formatTime(snap.durationMs)}`}
           </span>
@@ -371,6 +396,20 @@ export function Reader({
             onCopy={() => void navigator.clipboard?.writeText(sentencePreview(loaded, menu, Infinity))}
             close={() => setMenu(null)}
           />
+        </Sheet>
+      )}
+
+      {menu?.kind === 'toc' && (
+        <Sheet title="목차" onClose={() => setMenu(null)}>
+          <ul className="toc">
+            {chapters.map((c, k) => (
+              <li key={c.seg} className={`d${c.depth} ${k === chapterIdx ? 'on' : ''}`}>
+                <button type="button" className="link" disabled={seekLocked} onClick={() => jumpTo(c.seg)}>
+                  <span className="time">{formatTime(player.audioStart(c.seg))}</span> {c.title}
+                </button>
+              </li>
+            ))}
+          </ul>
         </Sheet>
       )}
 
@@ -456,6 +495,20 @@ export function Reader({
                 가사형
               </button>
             </div>
+          </div>
+          <div className="row">
+            <span>목차</span>
+            <button type="button" onClick={() => setMenu({ kind: 'toc' })}>
+              목차 보기 ({chapters.length})
+            </button>
+          </div>
+          <div className="row">
+            <span>이어폰·잠금화면 이전/다음</span>
+            <select value={settings.remoteUnit} onChange={(e) => onSettings({ ...settings, remoteUnit: e.currentTarget.value as Settings['remoteUnit'] })}>
+              <option value="sentence">한 문장</option>
+              <option value="15s">15초</option>
+              <option value="chapter">한 챕터</option>
+            </select>
           </div>
           <div className="row">
             <span>북마크</span>
