@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { classifyFile } from '../core/classify'
-import { deleteBook, listBooks, storageEstimate, type BookMeta } from '../io/store'
+import { readTextFile } from '../io/decodeText'
+import { downloadJson } from '../io/download'
+import { deleteBook, exportBooks, importBooks, listBooks, storageEstimate, type BookMeta } from '../io/store'
 import { addFromFiles, reopen, type LoadedBook } from '../reader/openBook'
 import { formatTime } from '../format'
 
@@ -31,8 +33,29 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
     }
   }
 
-  const onAdd = (list: FileList | null) => {
-    if (list?.length) void run('책을 읽고 정렬하는 중…', () => addFromFiles([...list]))
+  const onAdd = async (list: FileList | null) => {
+    if (!list?.length) return
+    const files = [...list]
+    // 책 패키지(.json): 서재에 가져오기만 하고, 열 때 오디오를 고름
+    const packages = files.filter((f) => classifyFile(f.name, f.type) === 'package')
+    if (packages.length) {
+      setError('')
+      try {
+        let n = 0
+        for (const p of packages) n += await importBooks((await readTextFile(p)).text)
+        setBusy(`${n}권을 가져왔습니다. 책을 누르고 오디오 파일을 고르면 이어서 들을 수 있습니다.`)
+        refresh()
+      } catch (e) {
+        setError((e as Error).message)
+      }
+    }
+    const rest = files.filter((f) => classifyFile(f.name, f.type) !== 'package')
+    if (rest.length) void run('책을 읽고 정렬하는 중…', () => addFromFiles(rest))
+  }
+
+  const backup = async () => {
+    const pkg = await exportBooks()
+    downloadJson(pkg, `오디오북리더-백업-${new Date().toISOString().slice(0, 10)}.json`)
   }
 
   const onReopenFile = (list: FileList | null) => {
@@ -111,6 +134,11 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
 
       <footer className="lib-foot">
         <span>{usage}</span>
+        {books && books.length > 0 && (
+          <button type="button" className="link-inline" onClick={() => void backup()}>
+            전체 백업(.json)
+          </button>
+        )}
         <a href="#diag">진단 페이지</a>
       </footer>
     </div>

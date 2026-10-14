@@ -1,4 +1,4 @@
-export type FileKind = 'audio' | 'subtitle' | 'book' | 'unknown'
+export type FileKind = 'audio' | 'subtitle' | 'book' | 'package' | 'unknown'
 
 const AUDIO = new Set(['mp3', 'm4a', 'm4b', 'aac', 'mp4', 'ogg', 'oga', 'opus', 'wav', 'flac', 'webm'])
 const SUBTITLE = new Set(['srt', 'vtt'])
@@ -8,6 +8,7 @@ const BOOK = new Set(['md', 'markdown', 'txt', 'epub', 'pdf'])
 export function classifyFile(name: string, mime = ''): FileKind {
   const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
   if (SUBTITLE.has(ext)) return 'subtitle'
+  if (ext === 'json') return 'package'
   if (BOOK.has(ext)) return 'book'
   if (AUDIO.has(ext)) return 'audio'
   if (mime.startsWith('audio/')) return 'audio'

@@ -10,6 +10,7 @@ describe('classifyFile', () => {
     expect(classifyFile('a.vtt')).toBe('subtitle')
     expect(classifyFile('book-guide.md')).toBe('book')
     expect(classifyFile('x.epub')).toBe('book')
+    expect(classifyFile('백업.abr.json')).toBe('package')
   })
   it('확장자가 없으면 MIME', () => {
     expect(classifyFile('recording', 'audio/mpeg')).toBe('audio')

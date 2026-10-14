@@ -4,7 +4,8 @@ import type { Player } from '../core/player'
 import type { Tolerance } from '../core/align'
 import type { RepeatController, RepeatState } from '../core/repeat'
 import { formatTime } from '../format'
-import { patchMeta, type Bookmark, type BookMeta, type Settings } from '../io/store'
+import { downloadJson, safeFileName } from '../io/download'
+import { exportBooks, patchMeta, type Bookmark, type BookMeta, type Settings } from '../io/store'
 import { chapterAt } from '../core/chapters'
 import { useEngine } from '../useEngine'
 import { BookView } from './BookView'
@@ -574,6 +575,18 @@ export function Reader({
               <option value="15s">15초</option>
               <option value="chapter">한 챕터</option>
             </select>
+          </div>
+          <div className="row">
+            <span>책 패키지</span>
+            <button
+              type="button"
+              onClick={async () => {
+                save()
+                downloadJson(await exportBooks([loaded.meta.id]), `${safeFileName(meta.title)}.abr.json`)
+              }}
+            >
+              이 책 내보내기(.json)
+            </button>
           </div>
           <div className="row">
             <span>북마크</span>

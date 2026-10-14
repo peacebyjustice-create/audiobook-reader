@@ -1,5 +1,6 @@
 // 기기 안 저장소(IndexedDB, idb-keyval). 오디오는 저장하지 않음(Q33 A): 자막·책 글과 진도만.
 import { createStore, del, entries, get, set } from 'idb-keyval'
+import { buildPackage, parsePackage, pickNewer, type BookPackage, type PackageEntry } from '../core/bookPackage'
 import type { ManualAnchor, Tolerance } from '../core/align'
 import { DEFAULT_REPEAT, type RepeatSettings } from '../core/repeat'
 
@@ -92,6 +93,29 @@ export function patchMeta(id: string, patch: Partial<BookMeta>): Promise<BookMet
 export async function deleteBook(id: string) {
   await del(`meta:${id}`, db)
   await del(`text:${id}`, db)
+}
+
+/** 책 패키지 내보내기(F22). ids가 없으면 서재 전체 */
+export async function exportBooks(ids?: string[]): Promise<BookPackage<BookMeta, BookTexts>> {
+  const metas = (await listBooks()).filter((m) => !ids || ids.includes(m.id))
+  const books: PackageEntry<BookMeta, BookTexts>[] = []
+  for (const meta of metas) {
+    const texts = await getTexts(meta.id)
+    if (texts) books.push({ meta, texts })
+  }
+  return buildPackage(books)
+}
+
+/** 책 패키지 가져오기. 같은 책은 더 최근 진도를 남기고, 글은 덮어씀. 가져온 권수를 돌려줌 */
+export async function importBooks(text: string): Promise<number> {
+  const pkg = parsePackage<BookMeta, BookTexts>(text)
+  for (const { meta, texts } of pkg.books) {
+    await queued(async () => {
+      await saveTexts(meta.id, texts)
+      await saveMeta(pickNewer(await getMeta(meta.id), meta))
+    })
+  }
+  return pkg.books.length
 }
 
 export async function getSettings(): Promise<Settings> {
