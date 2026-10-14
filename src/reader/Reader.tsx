@@ -17,6 +17,9 @@ export interface ReaderSession {
 }
 
 const LONG_PRESS_MS = 500
+/** 이 길이 이상인 VBR mp3는 변환 전까지 위치 이동을 잠금(F23, Q11 B) */
+const VBR_LOCK_MS = 30 * 60_000
+const CONVERT_CMD = 'ffmpeg -i 입력.mp3 -map 0:a -c:a aac -b:a 64k -ac 1 -movflags +faststart 출력.m4a'
 const SAVE_EVERY_MS = 5000
 
 function useRepeatState(repeat: RepeatController): RepeatState {
@@ -48,6 +51,10 @@ export function Reader({
   const [menu, setMenu] = useState<Menu>(null)
   const [toast, setToast] = useState<{ text: string; backTo: number } | null>(null)
   const articleRef = useRef<HTMLElement>(null)
+
+  const vbr = loaded.mp3?.kind === 'vbr'
+  const seekLocked = vbr && snap.durationMs >= VBR_LOCK_MS
+  const lockedToast = () => setToast({ text: 'VBR 파일이라 위치 이동이 잠겨 있습니다', backTo: -1 })
 
   const current = repeat.displayIndex()
   const curSeg = timeline.segments[current]
@@ -184,6 +191,7 @@ export function Reader({
     if (!t) return
     const seg = t.seg >= 0 ? t.seg : t.sent !== null ? nearestSeg(t.sent) : -1
     if (seg < 0) return
+    if (seekLocked) return lockedToast()
     const backTo = engine.currentMs
     void repeat.tap(seg)
     setFollowing(true)
@@ -201,6 +209,7 @@ export function Reader({
   // 반복 버튼: 누르기 = 토글, 길게 = 이 문장 반복
   const repPress = useRef<{ timer: number; fired: boolean } | null>(null)
   const repDown = () => {
+    if (seekLocked) return
     const timer = window.setTimeout(() => {
       if (repPress.current) repPress.current.fired = true
       navigator.vibrate?.(15)
@@ -255,6 +264,13 @@ export function Reader({
 
       {loaded.notice && <p className="notice">{loaded.notice}</p>}
       {snap.error && <p className="error">{snap.error}</p>}
+      {vbr && (
+        <p className="error">
+          가변 비트레이트(VBR) mp3입니다. 위치를 옮기면 소리와 강조가 수 초까지 어긋날 수 있습니다.
+          {seekLocked && ' 30분 이상이라 변환 전까지 문장 이동·반복·진행바 이동을 잠갔습니다(처음부터 이어 듣기는 됩니다).'} PC에서 m4a로 변환한 뒤, 서재에서 이 책을 눌러
+          변환한 파일을 고르면 진도가 그대로 이어집니다: <code>{CONVERT_CMD}</code>
+        </p>
+      )}
 
       <article
         ref={articleRef}
@@ -270,7 +286,7 @@ export function Reader({
       </article>
 
       <div className="floating">
-        {curSeg?.kind === 'audio' && (
+        {curSeg?.kind === 'audio' && !seekLocked && (
           <button type="button" className="chip" onClick={() => repeat.tap(current + 1)}>
             건너뛰기 ›
           </button>
@@ -283,7 +299,7 @@ export function Reader({
         {toast && (
           <div className="toast">
             {toast.text}
-            <button
+            {toast.backTo >= 0 && <button
               type="button"
               onClick={() => {
                 repeat.seekManual(toast.backTo)
@@ -291,7 +307,7 @@ export function Reader({
               }}
             >
               이전 위치로
-            </button>
+            </button>}
           </div>
         )}
       </div>
@@ -305,27 +321,29 @@ export function Reader({
           max={Math.max(1, snap.durationMs)}
           step={1000}
           value={snap.currentMs}
+          disabled={seekLocked}
           onChange={(e) => repeat.seekManual(Number(e.currentTarget.value))}
         />
         <div className="status">
           <span className="chapter">{heading}</span>
           <span className="time">
-            {formatTime(snap.currentMs)} / {formatTime(snap.durationMs)}
+            {snap.error ? '--:--' : `${formatTime(snap.currentMs)} / ${formatTime(snap.durationMs)}`}
           </span>
         </div>
         <div className="buttons">
-          <button type="button" onClick={() => repeat.prev()} aria-label="이전 문장">
+          <button type="button" disabled={seekLocked} onClick={() => repeat.prev()} aria-label="이전 문장">
             ⏮
           </button>
           <button type="button" className="play" onClick={() => player.togglePlay()} aria-label={snap.paused ? '재생' : '일시정지'}>
             {snap.paused ? '▶' : '⏸'}
           </button>
-          <button type="button" onClick={() => repeat.next()} aria-label="다음 문장">
+          <button type="button" disabled={seekLocked} onClick={() => repeat.next()} aria-label="다음 문장">
             ⏭
           </button>
           <button
             type="button"
             className={`rep ${rep.mode}`}
+            disabled={seekLocked}
             aria-label="구간반복(길게 누르면 이 문장 반복)"
             onPointerDown={repDown}
             onPointerUp={repUp}
@@ -452,6 +470,7 @@ export function Reader({
                   <button
                     type="button"
                     className="link"
+                    disabled={seekLocked}
                     onClick={() => {
                       repeat.seekManual(b.ms)
                       setFollowing(true)

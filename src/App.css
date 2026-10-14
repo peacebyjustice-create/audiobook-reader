@@ -458,3 +458,15 @@ button {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+.buttons button:disabled,
+.bar .progress:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.error code {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8em;
+  word-break: break-all;
+}

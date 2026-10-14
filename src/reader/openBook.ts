@@ -6,7 +6,9 @@ import { parseMarkdown } from '../core/markdown'
 import { parsePlainText } from '../core/plaintext'
 import { parseSrt, type Cue } from '../core/srt'
 import { bookTimeline, cueTimeline, type Timeline } from '../core/timeline'
+import type { Mp3Scan } from '../core/mp3scan'
 import { readTextFile } from '../io/decodeText'
+import { probeMp3 } from '../io/probeAudio'
 import { bookId, getMeta, getTexts, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
 import { alignInWorker } from '../workers/alignClient'
 
@@ -23,6 +25,8 @@ export interface LoadedBook {
   segHeading: (string | null)[]
   audioUrl: string
   revoke?: () => void
+  /** mp3 검사 결과(VBR 감지, F23). mp3가 아니거나 검사 못 했으면 null */
+  mp3: Mp3Scan | null
   /** 책 모드를 쓰지 못한 이유 등 */
   notice: string | null
 }
@@ -44,7 +48,7 @@ export async function addFromFiles(files: File[]): Promise<LoadedBook> {
   }
   const meta = await upsert(bookId(audio.name, audio.size), baseName(audio.name), audio.name, audio.size, texts, bookFile ? (ext === 'txt' ? 'txt' : 'md') : null)
   const url = URL.createObjectURL(audio)
-  return prepare(meta, texts, url, () => URL.revokeObjectURL(url))
+  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
 }
 
 /** 서재에서 다시 열기: 오디오만 다시 고름(Q33 A) */
@@ -52,7 +56,7 @@ export async function reopen(meta: BookMeta, audio: File): Promise<LoadedBook> {
   const texts = await getTexts(meta.id)
   if (!texts) throw new Error('저장된 자막을 찾지 못했습니다. 책을 다시 추가해 주세요.')
   const url = URL.createObjectURL(audio)
-  return prepare(meta, texts, url, () => URL.revokeObjectURL(url))
+  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
 }
 
 /** 개발 전용 픽스처: samples/에서 URL로 */
@@ -81,10 +85,10 @@ async function upsert(id: string, title: string, audioName: string, audioSize: n
   return meta
 }
 
-async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revoke?: () => void): Promise<LoadedBook> {
+async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revoke?: () => void, mp3: Mp3Scan | null = null): Promise<LoadedBook> {
   const { cues } = parseSrt(texts.srtText)
   if (!cues.length) throw new Error('자막에서 큐를 찾지 못했습니다.')
-  const base = { meta, cues, audioUrl, revoke }
+  const base = { meta, cues, audioUrl, revoke, mp3 }
   if (texts.bookText) {
     const book = meta.bookFormat === 'txt' ? parsePlainText(texts.bookText) : parseMarkdown(texts.bookText)
     try {
@@ -102,7 +106,7 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
   return srtMode(base, null)
 }
 
-function srtMode(base: Pick<LoadedBook, 'meta' | 'cues' | 'audioUrl' | 'revoke'>, notice: string | null): LoadedBook {
+function srtMode(base: Pick<LoadedBook, 'meta' | 'cues' | 'audioUrl' | 'revoke' | 'mp3'>, notice: string | null): LoadedBook {
   const timeline = cueTimeline(base.cues)
   return { ...base, book: null, alignment: null, timeline, segHeading: timeline.segments.map(() => null), notice }
 }
