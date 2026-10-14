@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { classifyFile } from '../core/classify'
+import { useInstallPrompt } from './useInstallPrompt'
 import { readTextFile } from '../io/decodeText'
 import { downloadJson } from '../io/download'
 import { deleteBook, exportBooks, importBooks, listBooks, storageEstimate, type BookMeta } from '../io/store'
@@ -8,6 +9,7 @@ import { formatTime } from '../format'
 
 /** 서재: 최근 책 목록(Q35 B)과 책 추가 */
 export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
+  const install = useInstallPrompt()
   const [books, setBooks] = useState<BookMeta[] | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
@@ -71,6 +73,11 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
     <div className="app library">
       <header className="top">
         <h1>오디오북리더</h1>
+        {install && (
+          <button type="button" className="open" onClick={install}>
+            앱 설치
+          </button>
+        )}
         <label className="open">
           책 추가
           {/* accept를 비워 둠: Android에서 .srt가 회색으로 막히는 문제 회피(FR-01) */}
