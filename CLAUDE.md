@@ -4,8 +4,10 @@
 
 ## 현재 상태 (2026-10-14)
 - **PRD 확정: `PRD.md`가 정본.** Q1=C(처음부터 책 정렬), 영어+한국어, 나머지 ★추천값.
-- M-1 환경 준비 완료(Vite+React+TS, Vitest, fast-check, Playwright 패키지 설치. 브라우저 바이너리는 E2E 시작할 때 설치). 다음은 **M0 골격**.
+- M-1 환경 준비 완료(Vite+React+TS, Vitest, fast-check, Playwright 패키지 설치. 브라우저 바이너리는 E2E 시작할 때 설치). **M0 골격 완료**(mp3+srt 큐 강조·자동 스크롤·이전/다음·탭 재생). 다음은 **M1 정렬 엔진**(md/txt 파서, 퍼지 정렬, 골든 테스트).
 - 저장소: `~/dev/audiobook-reader`(이 폴더). `samples` → 외장 샘플 폴더 심볼릭 링크(.gitignore). 테스트 `npm test`(Vitest+fast-check), 빌드 `npm run build`.
+- 개발 서버 `npm run dev` 후 `/?fixture=<샘플 파일명(확장자 제외)>`로 samples의 mp3+srt를 바로 엶(개발 전용, Range 서빙은 vite.config.ts의 samplesPlugin). 샘플 테스트 `src/core/samples.test.ts`는 samples가 있을 때만 실행.
+- 구조: `src/core`(순수 TS: srt 파서, navigation, player, AudioEngine+Fake), `src/audio`(HtmlAudioEngine), `src/io`(텍스트 디코딩).
 - 배경 자료: `PRD_질문지.md`(질문·답변 기록, 0-3 샘플 분석, 3장 메모리, 4장 리스크 R1~R7), `docs/리서치_원자료.json`(출처 URL).
 - 샘플: `외장 디스크의 샘플 폴더` (영어 Shortform 가이드 1,415세트, ElevenLabs TTS, CBR mp3, 원문 거의 그대로 낭독). 읽기 전용으로만 사용.
 - Mac 개발 환경: node 25, git, ffmpeg/ffprobe 7, Homebrew, python3.12. pandoc 없음.
