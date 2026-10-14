@@ -23,17 +23,31 @@ export class HtmlAudioEngine implements AudioEngine {
   private raf = 0
   /** 해제된 뒤에도 마지막 위치를 돌려줌(닫을 때 진도 저장이 해제보다 늦게 실행될 수 있음) */
   private final: { ms: number; dur: number } | null = null
+  /**
+   * 메타데이터를 읽기 전에 정한 시작 위치. 안드로이드는 메타데이터 전 currentTime 설정을 무시할 수 있어
+   * 읽은 뒤에 적용하고, 그때까지는 이 값을 현재 위치로 돌려줌(진도가 0으로 덮어써지지 않게)
+   */
+  private pendingMs: number | null = null
 
-  constructor(src: string) {
+  constructor(src: string, startMs = 0) {
     this.el = new Audio()
     this.el.preload = 'metadata'
     this.el.preservesPitch = true
+    if (startMs > 0) this.pendingMs = startMs
+    this.el.addEventListener('loadedmetadata', this.applyPending)
     this.el.src = src
     for (const e of EVENTS) this.el.addEventListener(e, this.onEvent)
   }
 
+  private applyPending = () => {
+    if (this.pendingMs === null) return
+    this.el.currentTime = this.pendingMs / 1000
+    this.pendingMs = null
+  }
+
   get currentMs() {
-    return this.final ? this.final.ms : this.el.currentTime * 1000
+    if (this.final) return this.final.ms
+    return this.pendingMs ?? this.el.currentTime * 1000
   }
   get durationMs() {
     if (this.final) return this.final.dur
@@ -66,7 +80,8 @@ export class HtmlAudioEngine implements AudioEngine {
     this.el.pause()
   }
   seek(ms: number) {
-    this.el.currentTime = ms / 1000
+    if (this.el.readyState === HTMLMediaElement.HAVE_NOTHING) this.pendingMs = ms
+    else this.el.currentTime = ms / 1000
     this.emit()
   }
 

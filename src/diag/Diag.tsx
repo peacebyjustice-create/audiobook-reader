@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HtmlAudioEngine } from '../audio/htmlAudioEngine'
 import { Player } from '../core/player'
 import { DEFAULT_REPEAT, RepeatController } from '../core/repeat'
+import { readLog } from '../io/eventLog'
 import { requestPersist, storageEstimate } from '../io/store'
 
 type Results = Record<string, unknown>
@@ -174,6 +175,7 @@ export default function Diag() {
         deviceMemoryGB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? null,
         at: new Date().toISOString(),
       })
+      put('playbackLog', await readLog())
     })()
   }, [])
 

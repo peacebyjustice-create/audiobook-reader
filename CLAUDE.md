@@ -5,6 +5,7 @@
 ## 현재 상태 (2026-10-14)
 - **PRD 확정: `PRD.md`가 정본.** Q1=C(처음부터 책 정렬), 영어+한국어, 나머지 ★추천값.
 - **M0~M3 완료(PC)**. 배포: https://peacebyjustice-create.github.io/audiobook-reader/ (공개 저장소 peacebyjustice-create/audiobook-reader, main에 push하면 Actions가 테스트 후 Pages 배포). 남은 것: **실기기(Android) 확인(AC-7)** → 사용자가 #diag 결과 JSON을 붙여 주면 반영, 그다음 1~2주 사용 후 M4.
+- 2026-10-15 사용자 피드백 반영: 오디오 앱 안 보관(OPFS, 추가할 때 백그라운드 복사 → 서재에서 바로 열림), 마지막 책 자동 열기(백그라운드 종료 대비), 시작 위치는 메타데이터 뒤에 적용(안드로이드에서 이어 듣기 안 되던 문제), 재생·페이지 이벤트 기록(#diag 결과의 playbackLog). 백그라운드 재생 중단 원인은 아직 실기기 로그 대기.
 - 저장소: `~/dev/audiobook-reader`. 커밋 작성자는 GitHub noreply 주소(저장소 로컬 git config). 개인 이메일을 커밋에 넣지 말 것.
 - 공개 저장소이므로 개인 계획 문서(`PRD_질문지.md`, `docs/`)는 .gitignore로 로컬에만 둠. 로컬 경로·개인 자료 설명을 커밋하지 말 것.
 - 샘플: 외장 디스크의 샘플 폴더(실제 경로는 `readlink samples`). 영어 요약 가이드 1,415세트(md+TTS mp3+Whisper srt). 읽기 전용.

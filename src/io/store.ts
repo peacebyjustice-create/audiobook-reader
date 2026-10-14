@@ -1,5 +1,6 @@
 // 기기 안 저장소(IndexedDB, idb-keyval). 오디오는 저장하지 않음(Q33 A): 자막·책 글과 진도만.
 import { createStore, del, entries, get, set } from 'idb-keyval'
+import { removeAudio } from './opfs'
 import { buildPackage, parsePackage, pickNewer, type BookPackage, type PackageEntry } from '../core/bookPackage'
 import type { ManualAnchor, Tolerance } from '../core/align'
 import { DEFAULT_REPEAT, type RepeatSettings } from '../core/repeat'
@@ -36,6 +37,8 @@ export interface BookMeta {
   anchors?: ManualAnchor[]
   /** 책이 있어도 자막 보기로 보기(Q19 수동 전환) */
   forceSrt?: boolean
+  /** 오디오를 앱 안(OPFS)에 보관했으면 true: 서재에서 바로 열림(F26) */
+  stored?: boolean
 }
 
 /** 자막·책 원문(크고 거의 안 바뀜) */
@@ -93,7 +96,13 @@ export function patchMeta(id: string, patch: Partial<BookMeta>): Promise<BookMet
 export async function deleteBook(id: string) {
   await del(`meta:${id}`, db)
   await del(`text:${id}`, db)
+  await removeAudio(id)
+  if ((await getLastBook()) === id) await setLastBook(null)
 }
+
+/** 마지막으로 연 책: 앱이 백그라운드에서 종료돼도 다시 열면 이어서 엶 */
+export const getLastBook = () => get<string | null>('lastBook', db)
+export const setLastBook = (id: string | null) => set('lastBook', id, db)
 
 /** 책 패키지 내보내기(F22). ids가 없으면 서재 전체 */
 export async function exportBooks(ids?: string[]): Promise<BookPackage<BookMeta, BookTexts>> {

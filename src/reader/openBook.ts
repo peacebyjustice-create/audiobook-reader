@@ -10,6 +10,7 @@ import { parseSrt, type Cue } from '../core/srt'
 import { bookTimeline, cueTimeline, type Timeline } from '../core/timeline'
 import type { Mp3Scan } from '../core/mp3scan'
 import { readTextFile } from '../io/decodeText'
+import { loadAudio, opfsSupported, storeAudio } from '../io/opfs'
 import { probeMp3 } from '../io/probeAudio'
 import { bookId, getMeta, getTexts, patchMeta, requestPersist, saveMeta, saveTexts, type BookMeta, type BookTexts } from '../io/store'
 import { alignInWorker } from '../workers/alignClient'
@@ -49,6 +50,7 @@ export async function addFromFiles(files: File[]): Promise<LoadedBook> {
     bookText: bookFile ? (await readTextFile(bookFile)).text : null,
   }
   const meta = await upsert(bookId(audio.name, audio.size), baseName(audio.name), audio.name, audio.size, texts, bookFile ? (ext === 'txt' ? 'txt' : 'md') : null)
+  keepInApp(meta, audio)
   const url = URL.createObjectURL(audio)
   return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
 }
@@ -57,8 +59,33 @@ export async function addFromFiles(files: File[]): Promise<LoadedBook> {
 export async function reopen(meta: BookMeta, audio: File): Promise<LoadedBook> {
   const texts = await getTexts(meta.id)
   if (!texts) throw new Error('저장된 자막을 찾지 못했습니다. 책을 다시 추가해 주세요.')
+  keepInApp(meta, audio)
   const url = URL.createObjectURL(audio)
   return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
+}
+
+/** 앱 안에 보관한 오디오로 바로 열기. 보관본이 없으면 null(파일을 다시 골라야 함) */
+export async function openStored(meta: BookMeta): Promise<LoadedBook | null> {
+  if (!meta.stored) return null
+  const audio = await loadAudio(meta.id, meta.audioName)
+  if (!audio) {
+    await patchMeta(meta.id, { stored: false })
+    return null
+  }
+  const texts = await getTexts(meta.id)
+  if (!texts) throw new Error('저장된 자막을 찾지 못했습니다. 책을 다시 추가해 주세요.')
+  const url = URL.createObjectURL(audio)
+  return prepare(meta, texts, url, () => URL.revokeObjectURL(url), await probeMp3(audio, audio.name))
+}
+
+/** 고른 오디오를 백그라운드에서 앱 안에 복사(재생은 바로 시작). 끝나면 다음부터 고르지 않아도 됨 */
+function keepInApp(meta: BookMeta, audio: File) {
+  if (meta.stored || !opfsSupported()) return
+  void storeAudio(meta.id, audio)
+    .then(() => patchMeta(meta.id, { stored: true }))
+    .catch(() => {
+      // 저장 공간 부족 등: 다음에 다시 고르면 됨
+    })
 }
 
 /** 개발 전용 픽스처: samples/에서 URL로 */

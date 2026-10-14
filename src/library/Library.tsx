@@ -4,7 +4,7 @@ import { useInstallPrompt } from './useInstallPrompt'
 import { readTextFile } from '../io/decodeText'
 import { downloadJson } from '../io/download'
 import { deleteBook, exportBooks, importBooks, listBooks, storageEstimate, type BookMeta } from '../io/store'
-import { addFromFiles, reopen, type LoadedBook } from '../reader/openBook'
+import { addFromFiles, openStored, reopen, type LoadedBook } from '../reader/openBook'
 import { formatTime } from '../format'
 
 /** 서재: 최근 책 목록(Q35 B)과 책 추가 */
@@ -106,6 +106,14 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
                 className="book"
                 onClick={() => {
                   reopenTarget.current = b
+                  if (b.stored) {
+                    void run('여는 중…', async () => {
+                      const l = await openStored(b)
+                      if (l) return l
+                      throw new Error(`앱에 보관한 오디오가 없어졌습니다. 책을 다시 눌러 '${b.audioName}'을 골라 주세요.`)
+                    }).then(refresh)
+                    return
+                  }
                   if (audioInput.current) {
                     audioInput.current.value = ''
                     audioInput.current.click()
@@ -120,7 +128,7 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
                 <span className="bar-mini">
                   <span style={{ width: `${pct}%` }} />
                 </span>
-                <span className="hint">눌러서 '{b.audioName}' 고르기</span>
+                <span className="hint">{b.stored ? '앱에 보관됨 · 누르면 바로 열림' : `눌러서 '${b.audioName}' 고르기`}</span>
               </button>
               <button
                 type="button"
@@ -139,6 +147,9 @@ export function Library({ onOpen }: { onOpen: (b: LoadedBook) => void }) {
         })}
       </ul>
 
+      <p className="meta-info">
+        다른 앱을 쓸 때 재생이 멈추면: 휴대폰 설정 › 애플리케이션 › Chrome › 배터리 › '제한 없음'으로 바꿔 주세요. 그래도 멈추면 진단 페이지의 결과 JSON(재생 기록 포함)을 보내 주세요.
+      </p>
       <footer className="lib-foot">
         <span>{usage}</span>
         {books && books.length > 0 && (
