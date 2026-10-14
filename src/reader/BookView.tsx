@@ -5,18 +5,22 @@ import type { LoadedBook } from './openBook'
 /**
  * 본문 렌더링. 강조·반복 표시는 Reader가 data-seg로 DOM 클래스만 바꿈(전체 다시 그리기 방지).
  * - 책 모드: 문장 span[data-seg][data-sent], 시각 없는 문장은 .dim. 오디오 전용 구간은 블록 뒤 .aud 줄
- * - 자막 보기: 큐 span[data-seg], 무음 2초 이상에서 문단
+ * - 자막 보기: 문장 단위로 묶은 큐 span[data-seg], 무음 2초 이상에서 문단
  */
 export const BookView = memo(function BookView({ loaded }: { loaded: LoadedBook }) {
   const { book, cues, timeline } = loaded
   if (!book) {
+    const segs = timeline.segments
     return (
       <>
-        {groupBySilence(cues).map(([a, b]) => (
+        {groupBySilence(segs).map(([a, b]) => (
           <p key={a}>
-            {cues.slice(a, b).map((c) => (
-              <span key={c.index} data-seg={c.index} className="s">
-                {c.text}{' '}
+            {segs.slice(a, b).map((s, k) => (
+              <span key={a + k} data-seg={a + k} className="s">
+                {cues
+                  .slice(s.cueStart, s.cueEnd)
+                  .map((c) => c.text)
+                  .join(' ')}{' '}
               </span>
             ))}
           </p>

@@ -39,6 +39,10 @@ it('문장 안에 끼어든 짧은 오디오 전용 구간은 버림', () => {
   expect(bookTimeline(book, cues, al).segments.map((s) => s.id)).toEqual(['s0'])
 })
 
-it('자막 타임라인은 큐 그대로', () => {
-  expect(cueTimeline([cue(0, 0, 1000), cue(1, 1500, 2000)]).segments.map((s) => s.id)).toEqual(['c0', 'c1'])
+it('자막 타임라인은 문장이 끝나는 큐까지 묶음', () => {
+  const cues = [cue(0, 0, 1000), cue(1, 1100, 2000), cue(2, 2100, 3000)].map((c, i) => ({ ...c, text: i === 0 ? 'Hello' : 'world.' }))
+  expect(cueTimeline(cues).segments.map((s) => [s.id, s.cueStart, s.cueEnd])).toEqual([
+    ['c0', 0, 2],
+    ['c2', 2, 3],
+  ])
 })

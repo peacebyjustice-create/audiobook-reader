@@ -1,13 +1,15 @@
-// 재생 단위 타임라인: 책 모드는 시각이 붙은 문장 + 오디오 전용 구간, SRT 모드는 큐.
+// 재생 단위 타임라인: 책 모드는 시각이 붙은 문장 + 오디오 전용 구간, 자막 보기는 문장 단위로 묶은 큐.
 // 이동·강조·반복은 모두 이 목록의 위치(segment index)로 함
 import type { Alignment } from './align'
 import type { Book } from './book'
+import type { Lang } from './normalize'
+import { bundleCues } from './paragraphs'
 import type { Cue } from './srt'
 
 export type SegmentKind = 'sentence' | 'audio' | 'cue'
 
 export interface Segment {
-  /** 저장용 보조 ID(NFR-09): s<문장>, a<첫 큐>, c<큐> */
+  /** 저장용 보조 ID(NFR-09): s<문장>, a<첫 큐>, c<묶음의 첫 큐> */
   id: string
   kind: SegmentKind
   startMs: number
@@ -25,9 +27,17 @@ export interface Timeline {
   sentenceSeg: Int32Array
 }
 
-export function cueTimeline(cues: readonly Cue[]): Timeline {
+/** 자막 보기 타임라인: 문장이 끝나는 큐까지 묶은 단위(Q13 B) */
+export function cueTimeline(cues: readonly Cue[], lang: Lang = 'en'): Timeline {
   return {
-    segments: cues.map((c, i) => ({ id: `c${i}`, kind: 'cue', startMs: c.startMs, endMs: c.endMs, cueStart: i, cueEnd: i + 1 })),
+    segments: bundleCues(cues, lang).map(([a, b]) => ({
+      id: `c${a}`,
+      kind: 'cue',
+      startMs: cues[a].startMs,
+      endMs: cues[b - 1].endMs,
+      cueStart: a,
+      cueEnd: b,
+    })),
     sentenceSeg: new Int32Array(0),
   }
 }

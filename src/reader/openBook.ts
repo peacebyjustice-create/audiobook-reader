@@ -3,6 +3,7 @@ import type { Alignment } from '../core/align'
 import type { Book } from '../core/book'
 import { baseName, classifyFile } from '../core/classify'
 import { parseMarkdown } from '../core/markdown'
+import { detectLang } from '../core/normalize'
 import { parsePlainText } from '../core/plaintext'
 import { parseSrt, type Cue } from '../core/srt'
 import { bookTimeline, cueTimeline, type Timeline } from '../core/timeline'
@@ -107,7 +108,7 @@ async function prepare(meta: BookMeta, texts: BookTexts, audioUrl: string, revok
 }
 
 function srtMode(base: Pick<LoadedBook, 'meta' | 'cues' | 'audioUrl' | 'revoke' | 'mp3'>, notice: string | null): LoadedBook {
-  const timeline = cueTimeline(base.cues)
+  const timeline = cueTimeline(base.cues, detectLang(base.cues.slice(0, 500).map((c) => c.text).join(' ')))
   return { ...base, book: null, alignment: null, timeline, segHeading: timeline.segments.map(() => null), notice }
 }
 
