@@ -9,7 +9,8 @@
   --accent: #3a6ea5;
   --danger: #b3261e;
   --reader-size: 1.15rem;
-  --bar-h: 112px;
+  --bar-h: 118px;
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
 }

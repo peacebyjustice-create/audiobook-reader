@@ -21,6 +21,8 @@ export class HtmlAudioEngine implements AudioEngine {
   readonly el: HTMLAudioElement
   private listeners = new Set<() => void>()
   private raf = 0
+  /** 해제된 뒤에도 마지막 위치를 돌려줌(닫을 때 진도 저장이 해제보다 늦게 실행될 수 있음) */
+  private final: { ms: number; dur: number } | null = null
 
   constructor(src: string) {
     this.el = new Audio()
@@ -31,9 +33,10 @@ export class HtmlAudioEngine implements AudioEngine {
   }
 
   get currentMs() {
-    return this.el.currentTime * 1000
+    return this.final ? this.final.ms : this.el.currentTime * 1000
   }
   get durationMs() {
+    if (this.final) return this.final.dur
     return Number.isFinite(this.el.duration) ? this.el.duration * 1000 : 0
   }
   get paused() {
@@ -46,7 +49,13 @@ export class HtmlAudioEngine implements AudioEngine {
     return this.el.playbackRate
   }
   set playbackRate(r: number) {
+    // 새 파일을 불러오면 playbackRate가 defaultPlaybackRate로 초기화되므로 둘 다 맞춤
+    this.el.defaultPlaybackRate = r
     this.el.playbackRate = r
+  }
+
+  setRate(r: number) {
+    this.playbackRate = r
   }
 
   /** 재생할 수 없는 파일이면 거부 대신 error 속성으로 알림 */
@@ -68,6 +77,7 @@ export class HtmlAudioEngine implements AudioEngine {
 
   /** 엔진을 버릴 때 호출. objectURL 해제는 만든 쪽 책임 */
   dispose() {
+    this.final = { ms: this.currentMs, dur: this.durationMs }
     cancelAnimationFrame(this.raf)
     for (const e of EVENTS) this.el.removeEventListener(e, this.onEvent)
     this.el.pause()

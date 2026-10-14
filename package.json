@@ -13,6 +13,7 @@
     "report": "tsx scripts/align-report.ts"
   },
   "dependencies": {
+    "idb-keyval": "^6.3.0",
     "marked": "^18.1.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

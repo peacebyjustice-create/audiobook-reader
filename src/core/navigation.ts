@@ -15,16 +15,3 @@ export function findIndexAt(starts: ArrayLike<number>, t: number): number {
 
 /** '이전'을 이 시간 안에 누르면 이전 문장, 그 뒤면 현재 문장 처음(FR-06) */
 export const PREV_GRACE_MS = 1500
-
-export function prevTarget(starts: ArrayLike<number>, t: number): number {
-  if (starts.length === 0) return -1
-  const i = findIndexAt(starts, t)
-  if (i < 0) return 0
-  if (t - starts[i] < PREV_GRACE_MS) return Math.max(0, i - 1)
-  return i
-}
-
-export function nextTarget(starts: ArrayLike<number>, t: number): number {
-  if (starts.length === 0) return -1
-  return Math.min(starts.length - 1, findIndexAt(starts, t) + 1)
-}
