@@ -251,11 +251,11 @@ button {
 .buttons {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   margin-top: 6px;
 }
 .buttons button {
-  min-width: 52px;
+  min-width: 48px;
   height: 48px;
   padding: 0 8px;
   font-size: 1.2rem;
@@ -590,4 +590,31 @@ button {
   color: var(--accent);
   font-weight: 600;
   pointer-events: none;
+}
+
+/* 듣기 연습: 글자를 가리고 문장 자리만 막대로 남김. 현재 문장은 강조색 막대로 위치를 알려 줌 */
+.reader.hide-text .s,
+.reader.hide-text .h,
+.reader.hide-text .aud {
+  color: transparent !important;
+  text-shadow: none;
+}
+.reader.hide-text .s {
+  background: var(--hover);
+  border-radius: 4px;
+}
+.reader.hide-text .s.current {
+  background: var(--highlight);
+}
+.reader.hide-text .h {
+  background: var(--hover);
+  border-radius: 4px;
+}
+.buttons .hide {
+  font-size: 0.9rem;
+}
+.buttons .hide.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }

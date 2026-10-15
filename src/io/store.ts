@@ -54,9 +54,11 @@ export interface Settings {
   repeat: RepeatSettings
   /** 잠금화면·이어폰 이전/다음 단위(Q6 D, 기본 문장) */
   remoteUnit: 'sentence' | '15s' | 'chapter'
+  /** 듣기 연습: 본문 글자 가리기(Q4 D) */
+  hideText: boolean
 }
 
-export const DEFAULT_SETTINGS: Settings = { fontSize: 18, view: 'book', repeat: DEFAULT_REPEAT, remoteUnit: 'sentence' }
+export const DEFAULT_SETTINGS: Settings = { fontSize: 18, view: 'book', repeat: DEFAULT_REPEAT, remoteUnit: 'sentence', hideText: false }
 
 export function bookId(audioName: string, audioSize: number): string {
   return `${audioName}|${audioSize}`

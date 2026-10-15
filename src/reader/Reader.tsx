@@ -313,7 +313,7 @@ export function Reader({
 
       <article
         ref={articleRef}
-        className={`reader ${settings.view === 'lyrics' ? 'lyrics' : ''}`}
+        className={`reader ${settings.view === 'lyrics' ? 'lyrics' : ''} ${settings.hideText ? 'hide-text' : ''}`}
         onClick={onClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -400,6 +400,15 @@ export function Reader({
           >
             {repLabel}
             {repCount}
+          </button>
+          <button
+            type="button"
+            className={`hide ${settings.hideText ? 'on' : ''}`}
+            aria-pressed={settings.hideText}
+            aria-label={settings.hideText ? '글자 보이기' : '글자 가리기(듣기 연습)'}
+            onClick={() => onSettings({ ...settings, hideText: !settings.hideText })}
+          >
+            {settings.hideText ? '보기' : '가림'}
           </button>
           <button type="button" onClick={() => setMenu({ kind: 'more' })} aria-label="더 보기">
             ⋯
